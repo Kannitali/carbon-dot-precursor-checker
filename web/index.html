@@ -25,6 +25,15 @@ button{font-family:inherit;cursor:pointer}
 .chip{border:1px solid var(--line);background:var(--card);color:#374151;border-radius:999px;padding:6px 12px;font-size:13px}
 .chip:hover{border-color:var(--accent);color:var(--accent)}
 .hint{color:var(--muted);font-size:12px;margin:0 0 16px}
+.trans{display:none;border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;background:var(--card);padding:10px 13px;margin:0 0 14px}
+.trans.show{display:block}
+.trans .tlabel{font-size:11px;color:var(--muted);letter-spacing:.03em}
+.trans .ten{font-size:15px;font-weight:600;color:var(--text);margin:3px 0 2px;word-break:break-word}
+.trans .tformula{font-size:13px;color:var(--accent);font-family:"SF Mono",Consolas,monospace;margin-left:8px}
+.trans .tnote{font-size:11px;color:var(--muted)}
+.trans.guess{border-left-color:#e0a020}
+.trans.guess .tnote{color:#a86b00}
+.trans.none{border-left-color:#c9ced6}
 .status{border-radius:14px;padding:15px 16px;margin-bottom:14px;border:1px solid var(--line);background:var(--card);display:none}
 .status.show{display:block}
 .status.ok{background:var(--okbg);border-color:#a7f3d0}
@@ -91,8 +100,13 @@ footer p{margin:0 0 8px}
     <input id="q" type="text" placeholder="如：柠檬酸 / citric acid" autocomplete="off" aria-label="原料名称">
     <button class="go" id="go" type="submit">查文献</button>
   </form>
+  <div class="trans" id="trans">
+    <div class="tlabel">自动翻译为英文检索词</div>
+    <div class="ten"><span id="transEn"></span><span class="tformula" id="transFormula"></span></div>
+    <div class="tnote" id="transNote"></div>
+  </div>
   <div class="chips" id="chips"></div>
-  <p class="hint">支持中文常用名、英文名称和缩写。中文名未收录时请用英文查询。</p>
+  <p class="hint">输入中文即自动翻译为英文化学名并附分子式；词库未收录时会按构词规则推断（请核对）。也可直接输入英文名或缩写。</p>
 
   <div class="libbar">
     <b>我的原料库 <span id="libCount"></span></b>
@@ -114,7 +128,7 @@ footer p{margin:0 0 8px}
   </div>
 
   <div class="err" id="err"></div>
-  <div class="loading" id="loading"><span class="spin"></span><span id="loadingText">正在检索 OpenAlex…</span></div>
+  <div class="loading" id="loading"><span class="spin"></span><span id="loadingText">正在检索文献…</span></div>
 
   <div class="status" id="status" aria-live="polite">
     <span class="badge" id="badge"></span>
@@ -126,11 +140,11 @@ footer p{margin:0 0 8px}
 
   <details>
     <summary>这个判断是怎么来的？</summary>
-    <p>工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文，再检查标题与摘要中的合成线索（如 from / derived / based on / carbonization of）和检测线索（如 detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，点击即可核对原文。</p>
+    <p>工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文；若 OpenAlex 不可用，自动切换到完全免费的 Crossref（无需注册、无每日配额）。若两者均未找到有效线索，再用 X-MOL 期刊文献库兜底检索（入口：x-mol.com/paper/chem）。再检查标题与摘要中的合成线索（如 from / derived / based on / carbonization of）和检测线索（如 detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，点击即可核对原文。</p>
   </details>
 
   <footer>
-    <p>数据来自 OpenAlex 开放学术索引；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</p>
+    <p>数据来自 OpenAlex 开放学术索引、Crossref DOI 注册库，兜底来自 X-MOL 期刊文献库；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</p>
     <p>“未检索到”不等于从未有人使用：建议换同义词、别名、化学式或掺杂形式再查，并以系统综述为准。</p>
   </footer>
 </div>
@@ -157,11 +171,122 @@ const ALIAS = {
   "苯二胺":"phenylenediamine","三聚氰胺":"melamine","谷胱甘肽":"glutathione",
   "精氨酸":"arginine","赖氨酸":"lysine","谷氨酸":"glutamic acid","组氨酸":"histidine",
   "色氨酸":"tryptophan","酪氨酸":"tyrosine","丝氨酸":"serine","丙氨酸":"alanine",
+  "苯丙氨酸":"phenylalanine","亮氨酸":"leucine","异亮氨酸":"isoleucine","缬氨酸":"valine",
+  "苏氨酸":"threonine","脯氨酸":"proline","甲硫氨酸":"methionine","蛋氨酸":"methionine",
   "天冬氨酸":"aspartic acid","牛磺酸":"taurine","叶绿素":"chlorophyll","腐殖酸":"humic acid",
   "咖啡酸":"caffeic acid","阿魏酸":"ferulic acid","柠檬酸钠":"sodium citrate",
   "氯化锌":"zinc chloride","乙酸锌":"zinc acetate","硝酸银":"silver nitrate",
   "硫酸":"sulfuric acid","盐酸":"hydrochloric acid","氢氧化钠":"sodium hydroxide",
   "抗坏血酸钠":"sodium ascorbate","柠檬酸铵":"ammonium citrate","氯化铵":"ammonium chloride"
+};
+
+// 扩充：碳点领域常见前驱体 / 试剂（中文 → 英文检索词）
+const ALIAS_EXTRA = {
+  "柠檬酸一水合物":"citric acid monohydrate","异抗坏血酸":"erythorbic acid","葡萄糖酸":"gluconic acid",
+  "葡萄糖酸钠":"sodium gluconate","乳糖":"lactose","甘露糖":"mannose","木糖":"xylose","核糖":"ribose",
+  "海藻糖":"trehalose","环糊精":"cyclodextrin","β-环糊精":"beta cyclodextrin","羧甲基纤维素":"carboxymethyl cellulose",
+  "壳聚糖季铵盐":"quaternized chitosan","甲壳素":"chitin","多巴胺盐酸盐":"dopamine hydrochloride",
+  "左旋多巴":"levodopa","肾上腺素":"epinephrine","儿茶酚":"catechol","邻苯二酚":"catechol",
+  "间苯二酚":"resorcinol","对苯二酚":"hydroquinone","苯酚":"phenol","苯胺":"aniline",
+  "邻苯三酚":"pyrogallol","间苯三酚":"phloroglucinol","水杨酸":"salicylic acid","没食子酸":"gallic acid",
+  "阿魏酸":"ferulic acid","咖啡酸":"caffeic acid","绿原酸":"chlorogenic acid","槲皮素":"quercetin",
+  "芦丁":"rutin","姜黄素":"curcumin","花青素":"anthocyanin","单宁酸":"tannic acid","鞣酸":"tannic acid",
+  "植酸":"phytic acid","亚麻酸":"linolenic acid","油酸":"oleic acid","硬脂酸":"stearic acid",
+  "棕榈酸":"palmitic acid","花生四烯酸":"arachidonic acid","丙酮酸":"pyruvic acid","乳酸":"lactic acid",
+  "琥珀酸":"succinic acid","酒石酸":"tartaric acid","马来酸":"maleic acid","富马酸":"fumaric acid",
+  "苯甲酸":"benzoic acid","水杨酸钠":"sodium salicylate","乙酸":"acetic acid","醋酸":"acetic acid",
+  "冰醋酸":"acetic acid","乙酸钠":"sodium acetate","甲酸":"formic acid","丙酸":"propionic acid",
+  "丁二酸":"succinic acid","己二酸":"adipic acid","乳酸钠":"sodium lactate","乙腈":"acetonitrile",
+  "甲醇":"methanol","乙醇":"ethanol","异丙醇":"isopropanol","丙酮":"acetone","二甲基亚砜":"dimethyl sulfoxide",
+  "DMSO":"dimethyl sulfoxide","四氢呋喃":"tetrahydrofuran","THF":"tetrahydrofuran","正己烷":"hexane",
+  "三氯甲烷":"chloroform","二氯甲烷":"dichloromethane","氯仿":"chloroform","甲苯":"toluene",
+  "苯":"benzene","环己烷":"cyclohexane","乙醚":"diethyl ether","乙酸乙酯":"ethyl acetate",
+  "氨水":"ammonia solution","氨":"ammonia","过氧化氢":"hydrogen peroxide","双氧水":"hydrogen peroxide",
+  "水合肼":"hydrazine hydrate","肼":"hydrazine","硼氢化钠":"sodium borohydride","硼氢化钾":"potassium borohydride",
+  "硝酸锌":"zinc nitrate","硫酸锌":"zinc sulfate","乙酸铜":"copper acetate","氯化铜":"copper chloride",
+  "硫酸铜":"copper sulfate","氯化铁":"ferric chloride","三氯化铁":"ferric chloride","氯化亚铁":"ferrous chloride",
+  "氯化锰":"manganese chloride","氯化钴":"cobalt chloride","氯化镍":"nickel chloride","氯化铝":"aluminum chloride",
+  "氯化钙":"calcium chloride","氯化镁":"magnesium chloride","氯化钠":"sodium chloride","氯化钾":"potassium chloride",
+  "硝酸银":"silver nitrate","硝酸铜":"copper nitrate","氢氧化钠":"sodium hydroxide","氢氧化钾":"potassium hydroxide",
+  "碳酸钠":"sodium carbonate","碳酸氢钠":"sodium bicarbonate","硫酸钠":"sodium sulfate","亚硫酸钠":"sodium sulfite",
+  "硫化钠":"sodium sulfide","硫代硫酸钠":"sodium thiosulfate","磷酸氢二钠":"disodium hydrogen phosphate",
+  "磷酸二氢钠":"sodium dihydrogen phosphate","磷酸三钠":"trisodium phosphate","偏磷酸钠":"sodium metaphosphate",
+  "钼酸铵":"ammonium molybdate","钨酸钠":"sodium tungstate","氯金酸":"chloroauric acid","氯铂酸":"chloroplatinic acid",
+  "乙二胺四乙酸":"ethylenediaminetetraacetic acid","EDTA":"ethylenediaminetetraacetic acid",
+  "三乙胺":"triethylamine","三乙烯四胺":"triethylenetetramine","四乙烯五胺":"tetraethylenepentamine",
+  "1,2-丙二胺":"1,2-diaminopropane","丁二胺":"putrescine","戊二胺":"cadaverine","尿素":"urea",
+  "甲基脲":"methylurea","氨基脲":"semicarbazide","氨基硫脲":"thiosemicarbazide","硫代乙酰胺":"thioacetamide",
+  "二硫化碳":"carbon disulfide","十二烷基硫酸钠":"sodium dodecyl sulfate","SDS":"sodium dodecyl sulfate",
+  "十六烷基三甲基溴化铵":"cetyltrimethylammonium bromide","CTAB":"cetyltrimethylammonium bromide",
+  "吐温80":"Tween 80","司盘80":"Span 80","曲拉通X-100":"Triton X-100","聚乙烯醇":"polyvinyl alcohol",
+  "PVA":"polyvinyl alcohol","聚丙烯酸":"polyacrylic acid","PAA":"polyacrylic acid",
+  "聚甲基丙烯酸":"polymethacrylic acid","聚苯乙烯":"polystyrene","聚苯胺":"polyaniline","聚吡咯":"polypyrrole",
+  "聚噻吩":"polythiophene","聚多巴胺":"polydopamine","壳寡糖":"chitosan oligosaccharide",
+  "牛血清白蛋白":"bovine serum albumin","卵清蛋白":"ovalbumin","血红蛋白":"hemoglobin","肌红蛋白":"myoglobin",
+  "溶菌酶":"lysozyme","胰蛋白酶":"trypsin","胃蛋白酶":"pepsin","胶原":"collagen","丝素蛋白":"silk fibroin",
+  "角蛋白":"keratin","酪蛋白":"casein","乳清蛋白":"whey protein","大豆蛋白":"soy protein",
+  "海藻":"seaweed","海带":"kelp","紫菜":"nori","茶叶":"tea leaves","咖啡渣":"coffee grounds",
+  "花生壳":"peanut shells","稻壳":"rice husk","麦秸秆":"wheat straw","玉米芯":"corn cob",
+  "甘蔗渣":"sugarcane bagasse","木屑":"wood chips","竹叶":"bamboo leaves","银杏叶":"ginkgo leaves",
+  "洋葱":"onion","大蒜":"garlic","生姜":"ginger","姜黄":"turmeric","胡萝卜":"carrot","菠菜":"spinach",
+  "柠檬":"lemon","橙子":"orange","香蕉":"banana","苹果":"apple","葡萄":"grape","石榴":"pomegranate",
+  "西瓜":"watermelon","草莓":"strawberry","蓝莓":"blueberry","桑葚":"mulberry","黑枸杞":"black goji berry",
+  "豆浆":"soy milk","豆腐":"tofu","啤酒":"beer","红酒":"red wine","酱油":"soy sauce","食醋":"vinegar",
+  "蜂蜜":"honey","蜂胶":"propolis","牛奶":"milk","羊奶":"goat milk","奶酪":"cheese","鸡蛋清":"egg white",
+  "蛋黄":"egg yolk","羽毛":"feather","毛发":"hair","指甲":"nail","皮肤":"skin","血液":"blood",
+  "丝瓜络":"loofah","荷叶":"lotus leaf","莲子":"lotus seed","人参":"ginseng","黄芪":"astragalus",
+  "甘草":"licorice","金银花":"honeysuckle","菊花":"chrysanthemum","玫瑰花":"rose flower",
+  "叶绿素":"chlorophyll","血红素":"heme","腐殖酸":"humic acid","黄腐酸":"fulvic acid",
+  "碱木质素":"alkali lignin","木质素磺酸钠":"sodium lignosulfonate","酶解木质素":"enzymatic lignin"
+};
+
+// 英文检索词 → 分子式（用于翻译预览展示，帮助人工核对）
+const FORMULA = {
+  "citric acid":"C₆H₈O₇","citric acid monohydrate":"C₆H₈O₇·H₂O","glucose":"C₆H₁₂O₆",
+  "fructose":"C₆H₁₂O₆","sucrose":"C₁₂H₂₂O₁₁","maltose":"C₁₂H₂₂O₁₁","lactose":"C₁₂H₂₂O₁₁",
+  "starch":"(C₆H₁₀O₅)ₙ","cellulose":"(C₆H₁₀O₅)ₙ","chitosan":"(C₆H₁₁NO₄)ₙ","chitin":"(C₈H₁₃NO₅)ₙ",
+  "glycogen":"(C₆H₁₀O₅)ₙ","dextrin":"(C₆H₁₀O₅)ₙ","cyclodextrin":"(C₆H₁₀O₅)ₙ",
+  "ethylenediamine":"C₂H₈N₂","diethylenetriamine":"C₄H₁₃N₃","triethylenetetramine":"C₆H₁₈N₄",
+  "tetraethylenepentamine":"C₈H₂₃N₅","urea":"CH₄N₂O","thiourea":"CH₄N₂S","formamide":"CH₃NO",
+  "acetamide":"C₂H₅NO","dimethylformamide":"C₃H₇NO","dimethyl sulfoxide":"C₂H₆OS",
+  "melamine":"C₃H₆N₆","acetonitrile":"C₂H₃N","glycine":"C₂H₅NO₂","L-cysteine":"C₃H₇NO₂S",
+  "cystine":"C₆H₁₂N₂O₄S₂","glutathione":"C₁₀H₁₇N₃O₆S","ascorbic acid":"C₆H₈O₆",
+  "sodium ascorbate":"C₆H₇NaO₆","erythorbic acid":"C₆H₈O₆","glutamic acid":"C₅H₉NO₄",
+  "arginine":"C₆H₁₄N₄O₂","lysine":"C₆H₁₄N₂O₂","histidine":"C₆H₉N₃O₂","tryptophan":"C₁₁H₁₂N₂O₂",
+  "tyrosine":"C₉H₁₁NO₃","phenylalanine":"C₉H₁₁NO₂","serine":"C₃H₇NO₃","alanine":"C₃H₇NO₂",
+  "aspartic acid":"C₄H₇NO₄","taurine":"C₂H₇NO₃S","proline":"C₅H₉NO₂","leucine":"C₆H₁₃NO₂",
+  "isoleucine":"C₆H₁₃NO₂","valine":"C₅H₁₁NO₂","threonine":"C₄H₉NO₃","methionine":"C₅H₁₁NO₂S",
+  "m-phenylenediamine":"C₆H₈N₂","o-phenylenediamine":"C₆H₈N₂","p-phenylenediamine":"C₆H₈N₂",
+  "phenylenediamine":"C₆H₈N₂","catechol":"C₆H₆O₂","resorcinol":"C₆H₆O₂","hydroquinone":"C₆H₆O₂",
+  "phenol":"C₆H₆O","aniline":"C₆H₇N","pyrogallol":"C₆H₆O₃","phloroglucinol":"C₆H₆O₃",
+  "salicylic acid":"C₇H₆O₃","gallic acid":"C₇H₆O₅","ferulic acid":"C₁₀H₁₀O₄","caffeic acid":"C₉H₈O₄",
+  "chlorogenic acid":"C₁₆H₁₈O₉","quercetin":"C₁₅H₁₀O₇","rutin":"C₂₇H₃₀O₁₆","curcumin":"C₂₁H₂₀O₆",
+  "tannic acid":"C₇₆H₅₂O₄₆","phytic acid":"C₆H₁₈O₂₄P₆","benzoic acid":"C₇H₆O₂",
+  "sodium benzoate":"C₇H₅NaO₂","sodium salicylate":"C₇H₅NaO₃","sodium citrate":"C₆H₅Na₃O₇",
+  "ammonium citrate":"C₆H₈N₂O₇","ammonium chloride":"NH₄Cl","sodium acetate":"C₂H₃NaO₂",
+  "acetic acid":"C₂H₄O₂","formic acid":"CH₂O₂","propionic acid":"C₃H₆O₂","oxalic acid":"C₂H₂O₄",
+  "malic acid":"C₄H₆O₅","succinic acid":"C₄H₆O₄","tartaric acid":"C₄H₆O₆","maleic acid":"C₄H₄O₄",
+  "fumaric acid":"C₄H₄O₄","adipic acid":"C₆H₁₀O₄","lactic acid":"C₃H₆O₃","pyruvic acid":"C₃H₄O₃",
+  "boric acid":"BH₃O₃","phosphoric acid":"H₃PO₄","sulfuric acid":"H₂SO₄","hydrochloric acid":"HCl",
+  "nitric acid":"HNO₃","sodium hydroxide":"NaOH","potassium hydroxide":"KOH","ammonia":"NH₃",
+  "ammonia solution":"NH₃·H₂O","hydrogen peroxide":"H₂O₂","hydrazine hydrate":"N₂H₄·H₂O",
+  "carbon disulfide":"CS₂","sodium borohydride":"NaBH₄","potassium borohydride":"KBH₄",
+  "glycerol":"C₃H₈O₃","ethylene glycol":"C₂H₆O₂","methanol":"CH₄O","ethanol":"C₂H₆O",
+  "isopropanol":"C₃H₈O","acetone":"C₃H₆O","toluene":"C₇H₈","benzene":"C₆H₆","chloroform":"CHCl₃",
+  "dichloromethane":"CH₂Cl₂","hexane":"C₆H₁₄","cyclohexane":"C₆H₁₂","ethyl acetate":"C₄H₈O₂",
+  "zinc chloride":"ZnCl₂","zinc acetate":"C₄H₆O₄Zn","zinc nitrate":"ZnN₂O₆","zinc sulfate":"ZnSO₄",
+  "silver nitrate":"AgNO₃","copper sulfate":"CuSO₄","copper chloride":"CuCl₂","copper acetate":"C₄H₆CuO₄",
+  "ferric chloride":"FeCl₃","ferrous chloride":"FeCl₂","manganese chloride":"MnCl₂","cobalt chloride":"CoCl₂",
+  "nickel chloride":"NiCl₂","aluminum chloride":"AlCl₃","calcium chloride":"CaCl₂","magnesium chloride":"MgCl₂",
+  "sodium chloride":"NaCl","potassium chloride":"KCl","sodium carbonate":"Na₂CO₃",
+  "sodium bicarbonate":"NaHCO₃","sodium sulfate":"Na₂SO₄","sodium sulfite":"Na₂SO₃",
+  "sodium sulfide":"Na₂S","sodium thiosulfate":"Na₂S₂O₃","sodium dodecyl sulfate":"C₁₂H₂₅NaO₄S",
+  "cetyltrimethylammonium bromide":"C₁₉H₄₂BrN","Tween 80":"C₆₄H₁₂₄O₂₆","Span 80":"C₂₄H₄₄O₆",
+  "polyethylenimine":"(C₂H₅N)ₙ","polyethylene glycol":"(C₂H₄O)ₙ","polyvinylpyrrolidone":"(C₆H₉NO)ₙ",
+  "polyvinyl alcohol":"(C₂H₄O)ₙ","polyacrylic acid":"(C₃H₄O₂)ₙ","EDTA":"C₁₀H₁₆N₂O₈",
+  "dopamine":"C₈H₁₁NO₂","dopamine hydrochloride":"C₈H₁₂ClNO₂","bovine serum albumin":"≈66.5 kDa",
+  "ovalbumin":"≈44.5 kDa","lysozyme":"≈14.3 kDa","hemoglobin":"≈64.5 kDa","chlorophyll":"C₅₅H₇₂MgN₄O₅",
+  "humic acid":"混合物","lignin":"聚合物","Triton X-100":"C₁₄H₂₂O(C₂H₄O)ₙ"
 };
 
 const SEED = {
@@ -206,6 +331,7 @@ const CHIPS = ["柠檬酸","葡萄糖","乙二胺","尿素","多巴胺","壳聚�
 const $ = id => document.getElementById(id);
 const norm = s => String(s || "").toLowerCase().replace(/[\u2010-\u2015\u2212\-]/g," ").replace(/[,.;:()\[\]{}"'`!?/\\]/g," ").replace(/\s+/g," ").trim();
 const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+for(const [k,v] of Object.entries(ALIAS_EXTRA)) ALIAS[k] = v;
 const ALIAS_N = {};
 for(const [k,v] of Object.entries(ALIAS)) ALIAS_N[norm(k)] = v;
 
@@ -215,6 +341,81 @@ function toEnglish(raw){
   return raw.trim().replace(/\s+/g," ");
 }
 function hasCJK(s){ return /[\u4e00-\u9fff]/.test(s); }
+
+// ===== 中文 → 英文化学名 自动翻译 =====
+// 化学词素表：用于词库未收录时按构词规则推断（结果标注为"推断"，需人工核对）
+const MORPH = {
+  "柠檬酸":"citric acid","葡萄糖":"glucose","果糖":"fructose","蔗糖":"sucrose","淀粉":"starch",
+  "纤维素":"cellulose","壳聚糖":"chitosan","木质素":"lignin","尿素":"urea","硫脲":"thiourea",
+  "乙二胺":"ethylenediamine","多巴胺":"dopamine","甘氨酸":"glycine","半胱氨酸":"L-cysteine",
+  "谷胱甘肽":"glutathione","抗坏血酸":"ascorbic acid","明胶":"gelatin","蛋白质":"protein",
+  "聚乙烯亚胺":"polyethylenimine","聚乙二醇":"polyethylene glycol","聚乙烯醇":"polyvinyl alcohol",
+  "苯":"benzene","苯胺":"aniline","苯酚":"phenol","吡啶":"pyridine","咪唑":"imidazole",
+  "萘":"naphthalene","蒽":"anthracene","芘":"pyrene","吲哚":"indole","噻吩":"thiophene",
+  "甲醇":"methanol","乙醇":"ethanol","丙醇":"propanol","丁醇":"butanol","甲醇钠":"sodium methoxide",
+  "甲酸":"formic acid","乙酸":"acetic acid","醋酸":"acetic acid","丙酸":"propionic acid",
+  "丁酸":"butyric acid","草酸":"oxalic acid","苹果酸":"malic acid","琥珀酸":"succinic acid",
+  "硼酸":"boric acid","磷酸":"phosphoric acid","硫酸":"sulfuric acid","硝酸":"nitric acid","盐酸":"hydrochloric acid",
+  "氯化":"chloride","硫酸盐":"sulfate","硝酸盐":"nitrate","乙酸盐":"acetate","氢氧化":"hydroxide",
+  "钠":"sodium","钾":"potassium","钙":"calcium","镁":"magnesium","锌":"zinc","铁":"iron",
+  "铜":"copper","银":"silver","铝":"aluminum","锰":"manganese","铵":"ammonium","锂":"lithium",
+  "甲":"methyl","乙":"ethyl","丙":"propyl","丁":"butyl","苯甲":"benzoyl","苯基":"phenyl",
+  "二":"di","三":"tri","四":"tetra","聚":"poly","亚":"imino","过":"per","羟基":"hydroxy",
+  "氨基":"amino","硝基":"nitro","巯基":"mercapto","羧基":"carboxyl","羰基":"carbonyl",
+  "酸":"acid","胺":"amine","醇":"alcohol","醛":"aldehyde","酮":"ketone","醚":"ether","酯":"ester",
+  "水合物":"hydrate","一水":"monohydrate","无水":"anhydrous"
+};
+const MORPH_KEYS = Object.keys(MORPH).sort((a,b)=>b.length-a.length);
+
+// 盐类构词：中文"酸根+金属" → 英文"metal + anion"（如 硫酸铜 → copper sulfate）
+const SALT_ANION = {"氯化":"chloride","氟化":"fluoride","溴化":"bromide","碘化":"iodide","硫化":"sulfide","硫酸":"sulfate","硝酸":"nitrate","碳酸":"carbonate","磷酸":"phosphate","乙酸":"acetate","醋酸":"acetate","氢氧化":"hydroxide"};
+const ELEMENT_CN = {"钠":"sodium","钾":"potassium","钙":"calcium","镁":"magnesium","锌":"zinc","铁":"iron","铜":"copper","银":"silver","铝":"aluminum","锰":"manganese","铵":"ammonium","锂":"lithium","亚铁":"ferrous","亚锡":"stannous"};
+const SALT_RE = /^(氢氧化|氯化|氟化|溴化|碘化|硫化|硫酸|硝酸|碳酸|磷酸|乙酸|醋酸)(亚铁|亚锡|钠|钾|钙|镁|锌|铁|铜|银|铝|锰|铵|锂)$/;
+function composeSalt(s){
+  const m = s.match(SALT_RE);
+  if(!m) return "";
+  const anion = SALT_ANION[m[1]];
+  const metal = ELEMENT_CN[m[2]] || m[2];
+  return anion && metal ? metal + " " + anion : "";
+}
+
+function composeByMorph(raw){
+  // 先试盐类模式（词库未命中时）
+  const sSalt = norm(raw).replace(/[\s]+/g,"");
+  const salt = composeSalt(sSalt);
+  if(salt) return salt;
+  let s = norm(raw).replace(/[\s]+/g,"");
+  if(!hasCJK(s)) return "";
+  let out = "", i = 0, matched = 0;
+  while(i < s.length){
+    let hit = "";
+    for(const k of MORPH_KEYS){
+      const kk = norm(k).replace(/[\s]+/g,"");
+      if(kk && s.slice(i, i+kk.length) === kk){ hit = kk; break; }
+    }
+    if(hit){ out += MORPH[Object.keys(MORPH).find(k=>norm(k).replace(/[\s]+/g,"")===hit)] + " "; i += hit.length; matched++; }
+    else { return ""; } // 有未识别字素，放弃推断，避免拼出错误化学名
+  }
+  return matched ? out.trim().replace(/\s+/g," ") : "";
+}
+
+// 返回 {en, formula, confidence, source, note}
+function translatePrem(raw){
+  const src = String(raw||"").trim();
+  if(!src) return null;
+  const k = norm(src);
+  // 1) 词库精确命中（最高可信）
+  if(ALIAS_N[k]){
+    const en = ALIAS_N[k];
+    return {en, formula:FORMULA[norm(en)]||"", confidence:"high", source:"词库", note:"本地化学词典精确匹配"};
+  }
+  // 2) 本身就是英文/缩写
+  if(!hasCJK(src)) return {en:src, formula:FORMULA[k]||"", confidence:"high", source:"原文", note:"英文名称直接用于检索"};
+  // 3) 词素构词推断
+  const guess = composeByMorph(src);
+  if(guess) return {en:guess, formula:FORMULA[norm(guess)]||"", confidence:"guess", source:"构词推断", note:"按化学词素推断，请核对后再检索"};
+  return {en:"", formula:"", confidence:"none", source:"未识别", note:"词典与构词规则均未收录"};
+}
 
 function abstractText(inv){
   if(!inv) return "";
@@ -253,6 +454,13 @@ function scorePaper(p,term){
   return {...p,score,tags};
 }
 
+function withTimeout(promise,ms){
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error("请求超时")),ms);
+    promise.then(v=>{clearTimeout(timer);resolve(v);},e=>{clearTimeout(timer);reject(e);});
+  });
+}
+
 async function fetchWorks(term,byAbstract){
   const field = byAbstract ? "abstract.search" : "title.search";
   const filter = [
@@ -264,7 +472,7 @@ async function fetchWorks(term,byAbstract){
     filter, "per-page":"25",
     select:"doi,title,publication_year,cited_by_count,primary_location,abstract_inverted_index"
   });
-  const res = await fetch(url,{headers:{Accept:"application/json"}});
+  const res = await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout?AbortSignal.timeout(12000):undefined});
   if(!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
   return (data.results || []).filter(w => w.doi && w.title).map(w => ({
@@ -273,8 +481,77 @@ async function fetchWorks(term,byAbstract){
     year:w.publication_year,
     journal:(w.primary_location && w.primary_location.source && w.primary_location.source.display_name) || "",
     cited:w.cited_by_count || 0,
-    abstract:abstractText(w.abstract_inverted_index)
+    abstract:abstractText(w.abstract_inverted_index),
+    source:"OpenAlex"
   }));
+}
+
+// 完全免费的备用源：Crossref（无需注册/key、无每日预算、CORS 开放）
+async function fetchCrossref(term){
+  const url = "https://api.crossref.org/works?" + new URLSearchParams({
+    "query.title":term + " carbon dots",
+    "filter":"type:journal-article,from-pub-date:2008-01-01",
+    "rows":"25",
+    "select":"DOI,title,issued,is-referenced-by-count,container-title"
+  });
+  const res = await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout?AbortSignal.timeout(12000):undefined});
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  const items = (data.message && data.message.items) || [];
+  return items
+    .filter(w => w.DOI && w.title && !/\.s\d+$/i.test(w.DOI))
+    .map(w => {
+      const dp = (w.issued && w.issued["date-parts"] && w.issued["date-parts"][0]) || [];
+      return {
+        doi:w.DOI,
+        title:Array.isArray(w.title) ? w.title[0] : w.title,
+        year:dp[0] || null,
+        journal:(w["container-title"] && w["container-title"][0]) || "",
+        cited:w["is-referenced-by-count"] || 0,
+        abstract:"",
+        source:"Crossref"
+      };
+    });
+}
+
+// 第三源 X-MOL（期刊文献入口 https://www.x-mol.com/paper/chem）：
+// 仅当 OpenAlex + Crossref 都没有有效线索时接管，返回带摘要与真实 DOI 的条目。
+function stripMarkup(s){
+  return String(s || "").replace(/<[^>]*>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&")
+    .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+    .replace(/\s+/g," ").trim();
+}
+async function fetchXmol(term){
+  const url = "https://www.x-mol.com/xmobile/paper/search?" + new URLSearchParams({
+    pageNo:"1", readMode:"en", option:term + " carbon dots"
+  });
+  const res = await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout?AbortSignal.timeout(16000):undefined});
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  const rows = (data.pageResults && data.pageResults.results) || data.list || [];
+  const t = norm(term);
+  const cdRe = /carbon (?:dots?|quantum dots?|nanodots?)/;
+  return rows.filter(w => {
+    const text = norm(stripMarkup(w.title) + " " + stripMarkup(w.summary || w.summaryZh || ""));
+    return w.doi && cdRe.test(text) && text.includes(t);
+  }).map(w => ({
+    doi:String(w.doi).replace(/^https?:\/\/doi\.org\//,""),
+    title:stripMarkup(w.title),
+    year:w.year || null,
+    journal:w.journalName || w.journalShortName || "",
+    cited:w.citationsCount || 0,
+    abstract:stripMarkup(w.summary || ""),
+    source:"X-MOL"
+  })).slice(0,25);
+}
+
+let _crPromise=null,_crKey="";
+function getCrossref(term){
+  const k=norm(term);
+  if(_crPromise && _crKey===k) return _crPromise;
+  _crKey=k;
+  _crPromise=withTimeout(fetchCrossref(term),14000).catch(()=>[]);
+  return _crPromise;
 }
 
 function cacheGet(term){
@@ -392,7 +669,7 @@ function render(term,raw,items,offline){
       `检索到的多为“检测该物质”的应用类文献。这不等于没人用过，建议换别名或英文名称再查。`);
   }else{
     setStatus("none","未检索到明确报道",`未找到「${raw}」的相关碳点文献`,
-      `本次 OpenAlex 检索没有返回结果。可尝试同义词、化学式、商品名或掺杂形式。`);
+      `本次检索（OpenAlex + Crossref + X-MOL）没有返回结果。可尝试同义词、化学式、商品名或掺杂形式。`);
   }
   if(offline){
     $("statusText").textContent += "（当前在线检索失败，仅显示本地已核对条目）";
@@ -407,7 +684,7 @@ function render(term,raw,items,offline){
   html += shown.length
     ? `<div class="section-title"><span>文献线索 · ${shown.length} 条</span>${refresh}</div>` + shown.map(paperHTML).join("")
     : `<div class="section-title"><span>文献线索</span>${refresh}</div>`;
-  html += `<div class="section-title"><span></span><a class="linkbtn" href="https://openalex.org/works?search=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">在 OpenAlex 查看全部结果</a></div>`;
+  html += `<div class="section-title"><span></span><a class="linkbtn" href="https://openalex.org/works?search=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">OpenAlex 全量</a> <a class="linkbtn" href="https://www.crossref.org/search/works?query=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">Crossref 全量</a> <a class="linkbtn" href="https://www.x-mol.com/paper/search/q?option=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">X-MOL 检索</a> <a class="linkbtn" href="https://www.x-mol.com/paper/chem" target="_blank" rel="noopener">X-MOL 化学</a></div>`;
   $("results").innerHTML = html;
 
   $("refresh").addEventListener("click",() => { localStorage.removeItem("cdcheck:" + norm(term)); search(raw); });
@@ -422,57 +699,106 @@ function render(term,raw,items,offline){
 async function search(raw){
   raw = raw.trim();
   if(!raw) return;
-  const term = toEnglish(raw);
+  const tr = translatePrem(raw);
+  const term = tr && tr.en ? tr.en : toEnglish(raw);
   $("err").className = "err";
   $("results").innerHTML = "";
-  if(hasCJK(raw) && !ALIAS_N[norm(raw)]){
-    setStatus("warn","需要英文名称",`「${raw}」不在本地词库中`,
-      `请改用英文原料名查询（如 citric acid、L-cysteine），或把这个中文名发给 WorkBuddy 让我补进词库。`);
+  // 中文且完全无法翻译（词典与构词都不认识）时才拦截
+  if(hasCJK(raw) && (!tr || tr.confidence === "none")){
+    setStatus("warn","无法自动翻译",`「${raw}」暂未收录，也没有可识别的化学构词`,
+      `请改用英文原料名查询（如 citric acid、L-cysteine），或把这个中文名发给 WorkBuddy 补进词库。`);
     return;
   }
+  // 构词推断的提示（仍继续检索，但提醒核对）
+  if(tr && tr.confidence === "guess"){
+    $("err").className = "err show";
+    $("err").textContent = `中文名未在词库中，已按构词规则推断为「${tr.en}」。请核对上方翻译是否正确；若不对请改用英文名检索。`;
+  }
+  updateTransPreview();
   const cached = cacheGet(term);
   if(cached){ render(term,raw,cached,false); return; }
 
   $("go").disabled = true;
   $("loading").className = "loading show";
-  $("loadingText").textContent = "正在检索 OpenAlex…";
+  $("loadingText").textContent = "正在检索文献…";
+
+  // 立即并行发起 Crossref（完全免费备用源），OpenAlex 失败时无缝接管
+  const crP = getCrossref(term);
 
   try{
     let found = [];
     try{
-      found = await fetchWorks(term,false);
+      found = await withTimeout(fetchWorks(term,false),14000);
       if(found.filter(p => cueRegex(norm(term),"synth").test(norm(p.title))).length < 2){
         $("loadingText").textContent = "正在补充摘要检索…";
-        const extra = await fetchWorks(term,true);
-        const seen = new Set(found.map(x => x.doi.toLowerCase()));
-        for(const p of extra) if(!seen.has(p.doi.toLowerCase())){ found.push(p); seen.add(p.doi.toLowerCase()); }
+        const extra = await withTimeout(fetchWorks(term,true),14000);
+        const seenOA = new Set(found.map(x => x.doi.toLowerCase()));
+        for(const p of extra) if(!seenOA.has(p.doi.toLowerCase())){ found.push(p); seenOA.add(p.doi.toLowerCase()); }
       }
-    }catch(netErr){
-      const seed = (SEED[norm(term)] || []).map(p => ({...p,title:p.title,year:p.year,cited:0,tags:[{text:"本地已核对",cls:"synth"}]}));
-      if(!seed.length) throw netErr;
+    }catch(netErr){ /* OpenAlex 不可用，交给 Crossref */ }
+
+    const cr = await crP;
+    const seenAll = new Set(found.map(x => x.doi.toLowerCase()));
+    let crAdded = 0;
+    for(const p of cr){
+      if(!seenAll.has(p.doi.toLowerCase())){ found.push(p); seenAll.add(p.doi.toLowerCase()); crAdded++; }
+    }
+
+    // 兜底：前两源无结果，或只有“检测用途”等无有效线索的结果时，改用 X-MOL
+    let xmolAdded = 0;
+    if(!found.some(p => scorePaper(p,term).score >= 2)){
+      $("loadingText").textContent = "其他引擎未命中，正在检索 X-MOL…";
+      try{
+        const xm = await withTimeout(fetchXmol(term),18000);
+        for(const p of xm){
+          if(!seenAll.has(p.doi.toLowerCase())){ found.push(p); seenAll.add(p.doi.toLowerCase()); xmolAdded++; }
+        }
+      }catch(xmErr){ /* X-MOL 不可用，继续走本地已核对条目 */ }
+    }
+
+    if(!found.length){
+      const seed = (SEED[norm(term)] || []).map(p => ({...p,title:p.title,year:p.year,cited:0,source:"本地",tags:[{text:"本地已核对",cls:"synth"}]}));
+      if(!seed.length) throw new Error("在线数据源均不可用");
       $("err").className = "err show";
-      $("err").textContent = "在线检索失败（网络或接口限流）。已切换到本地已核对条目。";
+      $("err").textContent = "在线检索失败（OpenAlex / Crossref / X-MOL 均未命中或不可用）。已切换到本地已核对条目。";
       render(term,raw,seed,true);
       return;
     }
+
     const scored = found.map(p => scorePaper(p,term));
     for(const s of (SEED[norm(term)] || [])){
-      if(!scored.some(x => x.doi.toLowerCase() === s.doi.toLowerCase())) scored.push({...s,cited:0,abstract:""});
+      if(!scored.some(x => x.doi.toLowerCase() === s.doi.toLowerCase())) scored.push({...s,cited:0,abstract:"",source:"本地"});
     }
     cacheSet(term,scored);
     render(term,raw,scored,false);
+    const srcs = [];
+    if(found.some(p => p.source === "OpenAlex")) srcs.push("OpenAlex");
+    if(crAdded) srcs.push("Crossref");
+    if(xmolAdded) srcs.push("X-MOL 兜底");
+    if(srcs.length) $("statusText").textContent += "（数据源：" + srcs.join(" + ") + "）";
   }catch(e){
     $("err").className = "err show";
-    $("err").textContent = "检索失败：" + e.message + "。请检查网络后重试，或直接到 OpenAlex 搜索。";
-    setStatus("none","检索失败","暂时无法完成检索","请稍后重试，或点击下方的 OpenAlex 链接手动查询。");
+    $("err").textContent = "检索失败：" + e.message + "。请检查网络后重试，或点击下方链接手动查询。";
+    setStatus("none","检索失败","暂时无法完成检索","请稍后重试，或点击下方的 OpenAlex / Crossref / X-MOL 链接手动查询。");
   }finally{
     $("go").disabled = false;
     $("loading").className = "loading";
   }
 }
 
+function updateTransPreview(){
+  const tr = translatePrem($("q").value);
+  const box = $("trans");
+  if(!tr || !$("q").value.trim()){ box.className="trans"; return; }
+  box.className = "trans show " + (tr.confidence==="guess"?"guess":tr.confidence==="none"?"none":"");
+  $("transEn").textContent = tr.en || "—";
+  $("transFormula").textContent = tr.formula ? " " + tr.formula : "";
+  $("transNote").textContent = (hasCJK($("q").value) ? "「"+$("q").value.trim()+"」→ " : "") + tr.source + " · " + tr.note;
+}
+
 $("chips").innerHTML = CHIPS.map(c => `<button class="chip" type="button">${c}</button>`).join("");
-$("chips").querySelectorAll(".chip").forEach(b => b.addEventListener("click",() => { $("q").value = b.textContent; search(b.textContent); }));
+$("chips").querySelectorAll(".chip").forEach(b => b.addEventListener("click",() => { $("q").value = b.textContent; updateTransPreview(); search(b.textContent); }));
+$("q").addEventListener("input", updateTransPreview);
 $("form").addEventListener("submit",e => { e.preventDefault(); search($("q").value); });
 
 $("libToggle").addEventListener("click",() => {

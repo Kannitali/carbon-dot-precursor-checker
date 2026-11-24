@@ -1,0 +1,71 @@
+<view class="page">
+  <view class="head">
+    <view class="h1">碳点原料文献查</view>
+    <view class="sub">输入一种原料，判断是否用于碳点制备，并给出可核对的文献链接</view>
+  </view>
+
+  <view class="bar">
+    <input
+      class="input"
+      value="{{query}}"
+      bindinput="onInput"
+      bindconfirm="search"
+      confirm-type="search"
+      placeholder="如：柠檬酸 / citric acid"
+      placeholder-class="ph"
+    />
+    <view class="go" bindtap="search">查文献</view>
+  </view>
+
+  <view class="chips">
+    <view wx:for="{{chips}}" wx:key="*this" class="chip" data-q="{{item}}" bindtap="quickTap">{{item}}</view>
+  </view>
+  <view class="hint">支持中文常用名、英文名和缩写。较少见的中文名请用英文查询。</view>
+
+  <view class="libbar" bindtap="openLibrary">
+    <view>我的原料库<view wx:if="{{libCount}}" class="count">（{{libCount}} 条）</view></view>
+    <view class="libgo">管理 / 导入</view>
+  </view>
+
+  <view wx:if="{{error}}" class="err">{{error}}</view>
+  <view wx:if="{{loading}}" class="loading">正在检索 OpenAlex…</view>
+
+  <view wx:if="{{status.title}}" class="status {{status.cls}}">
+    <view class="badge">{{status.badge}}</view>
+    <view class="stitle">{{status.title}}</view>
+    <view class="stext">{{status.text}}</view>
+    <view wx:if="{{cacheNote}}" class="note">{{cacheNote}}</view>
+  </view>
+
+  <view wx:if="{{localHits.length}}" class="localhit">
+    <view class="lh">我的原料库 · {{localHits.length}} 条组合包含该原料</view>
+    <view wx:for="{{localHits}}" wx:key="name" class="li">
+      <view class="ln">{{item.name}}：{{item.matsText}}</view>
+      <view wx:if="{{item.note}}" class="lnote">{{item.note}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{papers.length}}" class="section">文献线索 · {{papers.length}} 条</view>
+  <view wx:for="{{papers}}" wx:key="doi" class="paper">
+    <view class="ptitle">{{item.title}}</view>
+    <view class="pmeta">{{item.meta}}</view>
+    <view class="tags">
+      <view wx:for="{{item.tags}}" wx:for-item="tag" wx:key="text" class="tag {{tag.cls}}">{{tag.text}}</view>
+    </view>
+    <view class="act" data-doi="{{item.doi}}" bindtap="copyDoi">复制 doi:{{item.doi}}</view>
+  </view>
+
+  <view wx:if="{{papers.length}}" class="all" bindtap="copySearchLink">复制 OpenAlex 全部结果链接</view>
+
+  <view class="help">
+    <view class="summary" bindtap="toggleHelp">{{helpLabel}}</view>
+    <view wx:if="{{showHelp}}" class="helpbody">
+      工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文，再检查标题与摘要中的合成线索（from / derived / based on / carbonization of）和检测线索（detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，复制后可在浏览器核对原文。
+    </view>
+  </view>
+
+  <view class="footer">
+    <view>数据来自 OpenAlex 开放学术索引；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</view>
+    <view>“未检索到”不等于从未有人使用，建议换同义词、别名、化学式或掺杂形式再查，并以系统综述为准。</view>
+  </view>
+</view>

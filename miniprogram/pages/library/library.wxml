@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="tip">数据只保存在这台设备的微信本地存储里，不会上传。查询原料时会自动显示包含该原料的组合。</view>
+
+  <view class="card">
+    <view class="title">新增组合</view>
+    <input class="field" value="{{name}}" bindinput="onName" placeholder="组合名称，如：CA-EDA 体系" />
+    <input class="field" value="{{mats}}" bindinput="onMats" placeholder="原料，用 + 、 ，或逗号分隔" />
+    <input class="field" value="{{note}}" bindinput="onNote" placeholder="备注（可选）" />
+    <view class="btn main" bindtap="add">添加</view>
+  </view>
+
+  <view class="card">
+    <view class="title">批量导入</view>
+    <view class="hint">每行：名称 | 原料1,原料2 | 备注</view>
+    <view class="hint">例：CA-EDA | 柠檬酸,乙二胺 | 主体系</view>
+    <view class="hint">也支持粘贴 JSON 数组：[{"name":"组合","materials":["柠檬酸"],"note":"备注"}]</view>
+    <textarea class="area" value="{{bulk}}" bindinput="onBulk" placeholder="粘贴文本或 JSON" />
+    <view class="row">
+      <view class="btn main" bindtap="importText">导入</view>
+      <view class="btn" bindtap="exportText">导出并复制</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="title">已保存组合 · {{list.length}} 条</view>
+    <view wx:if="{{!list.length}}" class="empty">本地库为空，先添加或导入一组原料吧。</view>
+    <view wx:for="{{list}}" wx:key="id" class="item">
+      <view class="del" data-id="{{item.id}}" bindtap="del">删除</view>
+      <view class="iname">{{item.name}}</view>
+      <view class="imats">{{item.matsText}}</view>
+      <view wx:if="{{item.note}}" class="inote">{{item.note}}</view>
+    </view>
+    <view wx:if="{{list.length}}" class="btn danger" bindtap="clear">清空本地库</view>
+  </view>
+</view>

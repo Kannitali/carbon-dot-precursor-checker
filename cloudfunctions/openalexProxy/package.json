@@ -1,0 +1,7 @@
+{
+  "name": "openalexProxy",
+  "version": "1.0.0",
+  "description": "WeChat cloud function proxy for OpenAlex API",
+  "main": "index.js",
+  "dependencies": {}
+}

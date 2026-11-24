@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="碳点原料查">
+<title>碳点原料文献查</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#f5f7fb;--card:#ffffff;--text:#1f2937;--muted:#6b7280;--line:#e5e7eb;--accent:#2563eb;--ok:#15803d;--okbg:#ecfdf5;--warn:#b45309;--warnbg:#fffbeb;--graybg:#f3f4f6;--danger:#b91c1c}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:680px;margin:0 auto;padding:22px 18px 48px}
+header h1{font-size:21px;font-weight:600;margin:0 0 4px;letter-spacing:-.02em}
+header p{margin:0;color:var(--muted);font-size:13px}
+.searchbar{display:flex;gap:10px;margin:22px 0 12px}
+input[type=text]{flex:1;min-width:0;height:50px;padding:0 15px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:16px;color:var(--text);outline:none}
+input[type=text]:focus{border-color:var(--accent)}
+button{font-family:inherit;cursor:pointer}
+.go{height:50px;padding:0 20px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;white-space:nowrap}
+.go:disabled{background:#93b4f5;cursor:wait}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+.chip{border:1px solid var(--line);background:var(--card);color:#374151;border-radius:999px;padding:6px 12px;font-size:13px}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+.hint{color:var(--muted);font-size:12px;margin:0 0 16px}
+.status{border-radius:14px;padding:15px 16px;margin-bottom:14px;border:1px solid var(--line);background:var(--card);display:none}
+.status.show{display:block}
+.status.ok{background:var(--okbg);border-color:#a7f3d0}
+.status.warn{background:var(--warnbg);border-color:#fde68a}
+.status.none,.status.muted{background:var(--graybg)}
+.badge{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:999px;margin-bottom:6px;background:#fff;color:var(--text);border:1px solid var(--line)}
+.status.ok .badge{color:var(--ok)}
+.status.warn .badge{color:var(--warn)}
+.status-title{font-size:16px;font-weight:600;margin:0 0 2px}
+.status-text{font-size:13px;color:#4b5563;margin:0}
+.section-title{font-size:13px;font-weight:600;color:var(--muted);margin:20px 0 10px;display:flex;justify-content:space-between;align-items:center}
+.linkbtn{border:0;background:none;color:var(--accent);font-size:12px;padding:4px}
+.paper{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 15px;margin-bottom:10px}
+.paper h3{font-size:14px;font-weight:600;line-height:1.5;margin:0 0 6px}
+.meta{font-size:12px;color:var(--muted);margin:0 0 9px}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:9px}
+.tag{font-size:11px;padding:2px 7px;border-radius:6px;background:var(--graybg);color:#4b5563}
+.tag.seed{background:#e0e7ff;color:#3730a3}
+.tag.synth{background:var(--okbg);color:var(--ok)}
+.tag.detect{background:#fee2e2;color:var(--danger)}
+.actions{display:flex;gap:14px;flex-wrap:wrap}
+.actions a,.actions button{font-size:12px;color:var(--accent);text-decoration:none;border:0;background:none;padding:0}
+details{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:12px 15px;margin-top:14px;font-size:13px;color:#4b5563}
+summary{cursor:pointer;font-weight:600;color:var(--text)}
+details p{margin:10px 0 0}
+footer{margin-top:26px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:12px}
+footer p{margin:0 0 8px}
+.err{border:1px solid #fecaca;background:#fef2f2;color:var(--danger);border-radius:12px;padding:13px 15px;font-size:13px;margin-bottom:12px;display:none}
+.err.show{display:block}
+.loading{display:none;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:12px 0}
+.loading.show{display:flex}
+.spin{width:14px;height:14px;border:2px solid #d1d5db;border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.libbar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:0 0 12px;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.libbar b{font-size:13px}
+.libbtn{border:0;background:none;color:var(--accent);font-size:12px;padding:4px 0}
+.libpanel{display:none;border:1px solid var(--line);border-radius:14px;background:var(--card);padding:14px;margin:0 0 16px}
+.libpanel.show{display:block}
+.libpanel label{display:block;font-size:12px;color:var(--muted);margin:9px 0 4px}
+.libpanel input[type=text],.libpanel textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;color:var(--text);background:#fff;outline:none}
+.libpanel textarea{min-height:88px;resize:vertical;line-height:1.5}
+.librow{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.librow button{border:1px solid var(--line);background:var(--card);border-radius:9px;padding:8px 12px;font-size:12px;color:#374151}
+.librow button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.libhint{font-size:11px;color:var(--muted);line-height:1.6;margin:7px 0 0}
+.libitem{border:1px solid var(--line);border-radius:10px;padding:10px 11px;margin-top:9px;position:relative}
+.libitem .n{font-size:13px;font-weight:600;padding-right:44px}
+.libitem .m{font-size:12px;color:#4b5563;margin-top:3px}
+.libitem .note{font-size:11px;color:var(--muted);margin-top:3px}
+.libitem .del{position:absolute;right:10px;top:8px;border:0;background:none;color:var(--danger);font-size:11px}
+.localhit{border:1px solid #c7d2fe;background:#eef2ff;border-radius:14px;padding:13px 15px;margin-bottom:14px}
+.localhit h3{font-size:13px;margin:0 0 7px;color:#3730a3}
+.localhit .li{font-size:12px;color:#312e81;margin:4px 0;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>碳点原料文献查</h1>
+    <p>输入一种原料，判断它是否用于碳点制备，并给出可核对的文献链接</p>
+  </header>
+
+  <form class="searchbar" id="form">
+    <input id="q" type="text" placeholder="如：柠檬酸 / citric acid" autocomplete="off" aria-label="原料名称">
+    <button class="go" id="go" type="submit">查文献</button>
+  </form>
+  <div class="chips" id="chips"></div>
+  <p class="hint">支持中文常用名、英文名称和缩写。中文名未收录时请用英文查询。</p>
+
+  <div class="libbar">
+    <b>我的原料库 <span id="libCount"></span></b>
+    <button class="libbtn" id="libToggle" type="button">管理 / 导入</button>
+  </div>
+  <div class="libpanel" id="libPanel">
+    <label>新增组合名称</label>
+    <input id="libName" type="text" placeholder="如：CA-EDA 体系">
+    <label>原料（用 + 、 ，或逗号分隔）</label>
+    <input id="libMats" type="text" placeholder="柠檬酸 + 乙二胺">
+    <label>备注（可选）</label>
+    <input id="libNote" type="text" placeholder="如：2026.11 新配方">
+    <div class="librow"><button class="primary" id="libAdd" type="button">添加</button><button id="libExport" type="button">导出文本</button></div>
+    <label>批量导入（每行：名称 | 原料1,原料2 | 备注）</label>
+    <textarea id="libBulk" placeholder="CA-EDA | 柠檬酸,乙二胺 | 主体系"></textarea>
+    <p class="libhint">也支持粘贴 JSON 数组：[{"name":"组合","materials":["柠檬酸","乙二胺"],"note":"备注"}]。数据只保存在本机浏览器。</p>
+    <div class="librow"><button class="primary" id="libImport" type="button">导入</button><button id="libClear" type="button">清空本地库</button></div>
+    <div id="libList"></div>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div class="loading" id="loading"><span class="spin"></span><span id="loadingText">正在检索 OpenAlex…</span></div>
+
+  <div class="status" id="status" aria-live="polite">
+    <span class="badge" id="badge"></span>
+    <p class="status-title" id="statusTitle"></p>
+    <p class="status-text" id="statusText"></p>
+  </div>
+
+  <div id="results"></div>
+
+  <details>
+    <summary>这个判断是怎么来的？</summary>
+    <p>工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文，再检查标题与摘要中的合成线索（如 from / derived / based on / carbonization of）和检测线索（如 detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，点击即可核对原文。</p>
+  </details>
+
+  <footer>
+    <p>数据来自 OpenAlex 开放学术索引；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</p>
+    <p>“未检索到”不等于从未有人使用：建议换同义词、别名、化学式或掺杂形式再查，并以系统综述为准。</p>
+  </footer>
+</div>
+
+<script>
+const ALIAS = {
+  "柠檬酸":"citric acid","一水柠檬酸":"citric acid","葡萄糖":"glucose","可溶性淀粉":"starch",
+  "淀粉":"starch","乙二胺":"ethylenediamine","EDA":"ethylenediamine","二乙烯三胺":"diethylenetriamine",
+  "尿素":"urea","硫脲":"thiourea","多巴胺":"dopamine","盐酸多巴胺":"dopamine",
+  "壳聚糖":"chitosan","壳寡糖":"chitosan oligosaccharide","甘氨酸":"glycine","Gly":"glycine",
+  "半胱氨酸":"L-cysteine","L-半胱氨酸":"L-cysteine","胱氨酸":"cystine","抗坏血酸":"ascorbic acid",
+  "维生素C":"ascorbic acid","聚乙烯亚胺":"polyethyleneimine","PEI":"polyethyleneimine",
+  "聚乙二醇":"polyethylene glycol","PEG":"polyethylene glycol","聚乙烯吡咯烷酮":"polyvinylpyrrolidone",
+  "PVP":"polyvinylpyrrolidone","蔗糖":"sucrose","果糖":"fructose","麦芽糖":"maltose",
+  "明胶":"gelatin","牛血清白蛋白":"bovine serum albumin","BSA":"bovine serum albumin",
+  "蛋白质":"protein","木质素":"lignin","碱木质素":"lignin","纤维素":"cellulose",
+  "微晶纤维素":"cellulose","海藻酸钠":"sodium alginate","阿拉伯胶":"gum arabic",
+  "牛奶":"milk","脱脂牛奶":"milk","蜂蜜":"honey","橘皮":"orange peel","橙皮":"orange peel",
+  "柚子皮":"pomelo peel","香蕉汁":"banana juice","苹果酸":"malic acid","草酸":"oxalic acid",
+  "硼酸":"boric acid","磷酸":"phosphoric acid","甲酰胺":"formamide","乙酰胺":"acetamide",
+  "N,N-二甲基甲酰胺":"dimethylformamide","DMF":"dimethylformamide","甘油":"glycerol",
+  "间苯二胺":"m-phenylenediamine","mPD":"m-phenylenediamine","对苯二胺":"p-phenylenediamine",
+  "pPD":"p-phenylenediamine","邻苯二胺":"o-phenylenediamine","oPD":"o-phenylenediamine",
+  "苯二胺":"phenylenediamine","三聚氰胺":"melamine","谷胱甘肽":"glutathione",
+  "精氨酸":"arginine","赖氨酸":"lysine","谷氨酸":"glutamic acid","组氨酸":"histidine",
+  "色氨酸":"tryptophan","酪氨酸":"tyrosine","丝氨酸":"serine","丙氨酸":"alanine",
+  "天冬氨酸":"aspartic acid","牛磺酸":"taurine","叶绿素":"chlorophyll","腐殖酸":"humic acid",
+  "咖啡酸":"caffeic acid","阿魏酸":"ferulic acid","柠檬酸钠":"sodium citrate",
+  "氯化锌":"zinc chloride","乙酸锌":"zinc acetate","硝酸银":"silver nitrate",
+  "硫酸":"sulfuric acid","盐酸":"hydrochloric acid","氢氧化钠":"sodium hydroxide",
+  "抗坏血酸钠":"sodium ascorbate","柠檬酸铵":"ammonium citrate","氯化铵":"ammonium chloride"
+};
+
+const SEED = {
+  "citric acid":[
+    {doi:"10.1002/chem.201902497",title:"Carbon Dots from Citric Acid and its Intermediates Formed by Thermal Decomposition",year:2019,journal:"Chemistry – A European Journal",score:6,tags:["合成原料"]},
+    {doi:"10.1021/acs.jpcc.6b12519",title:"Molecular Fluorescence in Citric Acid-Based Carbon Dots",year:2017,journal:"The Journal of Physical Chemistry C",score:6,tags:["合成原料"]}
+  ],
+  "glucose":[
+    {doi:"10.1021/acsabm.0c00376",title:"Bioinspired Cryoprotectants of Glucose-Based Carbon Dots",year:2020,journal:"ACS Applied Bio Materials",score:6,tags:["合成原料"]}
+  ],
+  "ethylenediamine":[
+    {doi:"10.1016/j.snb.2015.05.006",title:"Ethylenediamine-assisted hydrothermal synthesis of nitrogen-doped carbon quantum dots as fluorescent probes",year:2015,journal:"Sensors and Actuators B: Chemical",score:6,tags:["合成原料"]}
+  ],
+  "urea":[
+    {doi:"10.1039/c8nr03602k",title:"Luminescence phenomena of carbon dots derived from citric acid and urea – a molecular insight",year:2018,journal:"Nanoscale",score:6,tags:["合成原料"]}
+  ],
+  "chitosan":[
+    {doi:"10.1039/c2ra21705h",title:"Fluorescent carbon dots obtained from chitosan gel",year:2012,journal:"RSC Advances",score:6,tags:["合成原料"]},
+    {doi:"10.1038/srep31100",title:"Simple Approach to Synthesize Amino-Functionalized Carbon Dots by Carbonization of Chitosan",year:2016,journal:"Scientific Reports",score:6,tags:["合成原料"]}
+  ],
+  "gelatin":[
+    {doi:"10.1016/j.carbon.2013.04.055",title:"Easy synthesis of highly fluorescent carbon quantum dots from gelatin and their luminescent properties and applications",year:2013,journal:"Carbon",score:6,tags:["合成原料"]}
+  ],
+  "lignin":[
+    {doi:"10.1021/acsami.1c16679",title:"Green Synthesis of Tunable Fluorescent Carbon Quantum Dots from Lignin and Their Application in Anti-Counterfeit Printing",year:2021,journal:"ACS Applied Materials & Interfaces",score:6,tags:["合成原料"]}
+  ],
+  "starch":[
+    {doi:"10.1002/bio.2744",title:"Preparation of carbon quantum dots based on starch and their spectral properties",year:2014,journal:"Luminescence",score:6,tags:["合成原料"]}
+  ],
+  "orange peel":[
+    {doi:"10.1016/j.foodchem.2020.127775",title:"Green one-step synthesis of carbon quantum dots from orange peel for fluorescent detection of Escherichia coli in milk",year:2020,journal:"Food Chemistry",score:6,tags:["合成原料"]}
+  ],
+  "milk":[
+    {doi:"10.1016/j.matlet.2019.01.064",title:"Carbon-quantum dots derived from denatured milk for efficient chromium-ion sensing and supercapacitor applications",year:2019,journal:"Materials Letters",score:6,tags:["合成原料"]}
+  ],
+  "m-phenylenediamine":[
+    {doi:"10.1021/acsanm.1c01838",title:"Polychromatic Carbon Dots Prepared from m-Phenylenediamine and Urea as Multifunctional Fluorescent Probes",year:2021,journal:"ACS Applied Nano Materials",score:6,tags:["合成原料"]}
+  ]
+};
+
+const CHIPS = ["柠檬酸","葡萄糖","乙二胺","尿素","多巴胺","壳聚糖","半胱氨酸","聚乙烯亚胺","木质素","间苯二胺"];
+const $ = id => document.getElementById(id);
+const norm = s => String(s || "").toLowerCase().replace(/[\u2010-\u2015\u2212\-]/g," ").replace(/[,.;:()\[\]{}"'`!?/\\]/g," ").replace(/\s+/g," ").trim();
+const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,"\\$&");
+const ALIAS_N = {};
+for(const [k,v] of Object.entries(ALIAS)) ALIAS_N[norm(k)] = v;
+
+function toEnglish(raw){
+  const k = norm(raw);
+  if(ALIAS_N[k]) return ALIAS_N[k];
+  return raw.trim().replace(/\s+/g," ");
+}
+function hasCJK(s){ return /[\u4e00-\u9fff]/.test(s); }
+
+function abstractText(inv){
+  if(!inv) return "";
+  const words = [];
+  for(const [w,pos] of Object.entries(inv)) for(const p of pos) words[p] = w;
+  return words.filter(Boolean).join(" ");
+}
+
+function cueRegex(term,type){
+  const e = esc(term);
+  const synth = [
+    `${e} based`,`based on ${e}`,`derived from ${e}`,`${e} derived`,
+    `from ${e}`,`prepared from ${e}`,`synthesized from ${e}`,`synthesis of [^.]{0,90} from ${e}`,
+    `carbonization of ${e}`,`pyrolysis of ${e}`,`hydrothermal[^.]{0,70} ${e}`,
+    `using ${e}`,`with ${e} as`,`${e} as (a |the )?(carbon|nitrogen|sulfur|dopant|precursor)`,
+    `${e} precursor`,`${e} doped`,`${e} doping`,`${e} as carbon source`
+  ];
+  const detect = [
+    `detection of ${e}`,`detecting ${e}`,`determination of ${e}`,`sensing of ${e}`,
+    `sensor for ${e}`,`probe for ${e}`,`for the detection of ${e}`,`${e} detection`,
+    `${e} sensing`,`monitoring ${e}`,`${e} levels`,`sensitive detection of ${e}`
+  ];
+  return new RegExp((type === "synth" ? synth : detect).join("|"),"i");
+}
+
+function scorePaper(p,term){
+  const title = norm(p.title), abs = norm(p.abstract || ""), t = norm(term);
+  const sr = cueRegex(t,"synth"), dr = cueRegex(t,"detect");
+  let score = 0;
+  const tags = [];
+  if(sr.test(title)){ score += 5; tags.push({text:"标题含合成线索",cls:"synth"}); }
+  else if(sr.test(abs)){ score += 2; tags.push({text:"摘要含合成线索",cls:"synth"}); }
+  if(dr.test(title)){ score -= 5; tags.push({text:"检测用途",cls:"detect"}); }
+  else if(dr.test(abs)){ score -= 2; tags.push({text:"摘要为检测用途",cls:"detect"}); }
+  if(title.includes(t)) score += 1;
+  return {...p,score,tags};
+}
+
+async function fetchWorks(term,byAbstract){
+  const field = byAbstract ? "abstract.search" : "title.search";
+  const filter = [
+    "title.search:carbon dots|carbon quantum dots|carbon nanodots|carbon dot",
+    `${field}:${term}`,
+    "from_publication_date:2008-01-01"
+  ].join(",");
+  const url = "https://api.openalex.org/works?" + new URLSearchParams({
+    filter, "per-page":"25",
+    select:"doi,title,publication_year,cited_by_count,primary_location,abstract_inverted_index"
+  });
+  const res = await fetch(url,{headers:{Accept:"application/json"}});
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  return (data.results || []).filter(w => w.doi && w.title).map(w => ({
+    doi:w.doi.replace(/^https?:\/\/doi\.org\//,""),
+    title:w.title,
+    year:w.publication_year,
+    journal:(w.primary_location && w.primary_location.source && w.primary_location.source.display_name) || "",
+    cited:w.cited_by_count || 0,
+    abstract:abstractText(w.abstract_inverted_index)
+  }));
+}
+
+function cacheGet(term){
+  try{
+    const c = JSON.parse(localStorage.getItem("cdcheck:" + norm(term)) || "null");
+    if(c && Date.now() - c.time < 7*24*3600*1000) return c.items;
+  }catch(e){}
+  return null;
+}
+function cacheSet(term,items){
+  try{ localStorage.setItem("cdcheck:" + norm(term),JSON.stringify({time:Date.now(),items})); }catch(e){}
+}
+
+const LIB_KEY = "cd_mylib_v1";
+const LAST = {raw:"",term:"",items:[],offline:false};
+function libLoad(){
+  try{
+    const v = JSON.parse(localStorage.getItem(LIB_KEY) || "[]");
+    return Array.isArray(v) ? v : [];
+  }catch(e){ return []; }
+}
+function libSave(list){
+  try{ localStorage.setItem(LIB_KEY,JSON.stringify(list)); }catch(e){ alert("本地存储失败，浏览器可能禁用了存储权限"); }
+}
+function splitMats(s){
+  return String(s || "").split(/[+,，、;；]/).map(x => x.trim()).filter(Boolean);
+}
+function libParse(text){
+  const s = String(text || "").trim();
+  if(!s) return [];
+  if(s.charAt(0) === "["){
+    const arr = JSON.parse(s);
+    if(!Array.isArray(arr)) throw new Error("JSON 顶层必须是数组");
+    return arr.filter(x => x && x.name).map(x => ({
+      id:String(Date.now()) + Math.random().toString(36).slice(2,7),
+      name:String(x.name),
+      materials:(Array.isArray(x.materials) ? x.materials : splitMats(x.materials)).map(String),
+      note:String(x.note || "")
+    })).filter(x => x.materials.length);
+  }
+  return s.split(/\n+/).map(line => line.trim()).filter(Boolean).map(line => {
+    const parts = line.split("|").map(x => x.trim());
+    if(parts.length < 2) return null;
+    const mats = splitMats(parts[1]);
+    if(!mats.length) return null;
+    return {id:String(Date.now()) + Math.random().toString(36).slice(2,7),name:parts[0],materials:mats,note:parts[2] || ""};
+  }).filter(Boolean);
+}
+function libMatch(term,raw){
+  const t = norm(term), r = norm(raw);
+  return libLoad().filter(x => (x.materials || []).some(m => {
+    const a = norm(m), b = norm(toEnglish(m));
+    return a === t || b === t || a === r || b === r;
+  }));
+}
+function renderLibPanel(){
+  const list = libLoad();
+  $("libCount").textContent = list.length ? `（${list.length} 条）` : "";
+  $("libList").innerHTML = list.map(x => `<div class="libitem">
+    <button class="del" type="button" data-del="${escapeHTML(x.id)}">删除</button>
+    <div class="n">${escapeHTML(x.name)}</div>
+    <div class="m">${escapeHTML((x.materials || []).join(" + "))}</div>
+    ${x.note ? `<div class="note">${escapeHTML(x.note)}</div>` : ""}
+  </div>`).join("");
+}
+function localHitHTML(hits){
+  if(!hits.length) return "";
+  return `<div class="localhit"><h3>我的原料库 · ${hits.length} 条组合包含该原料</h3>` +
+    hits.map(x => `<div class="li"><b>${escapeHTML(x.name)}</b>：${escapeHTML((x.materials || []).join(" + "))}${x.note ? " · " + escapeHTML(x.note) : ""}</div>`).join("") +
+    `</div>`;
+}
+function refreshAfterLibChange(){
+  renderLibPanel();
+  if(LAST.term) render(LAST.term,LAST.raw,LAST.items,LAST.offline);
+}
+
+function setStatus(cls,badge,title,text){
+  const box = $("status");
+  box.className = "status show " + cls;
+  $("badge").textContent = badge;
+  $("statusTitle").textContent = title;
+  $("statusText").textContent = text;
+}
+
+function paperHTML(p){
+  const tags = (p.tags || []).map(x => `<span class="tag ${x.cls}">${x.text}</span>`).join("");
+  const meta = [p.journal,p.year,p.cited ? `被引 ${p.cited}` : ""].filter(Boolean).join(" · ");
+  return `<div class="paper">
+    <h3>${escapeHTML(p.title)}</h3>
+    <p class="meta">${escapeHTML(meta)}</p>
+    <div class="tags">${tags}</div>
+    <div class="actions">
+      <a href="https://doi.org/${encodeURI(p.doi)}" target="_blank" rel="noopener">doi:${escapeHTML(p.doi)}</a>
+      <button type="button" data-copy="${escapeHTML(p.doi)}">复制 DOI</button>
+    </div>
+  </div>`;
+}
+function escapeHTML(s){
+  return String(s).replace(/[&<>"']/g,c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+function render(term,raw,items,offline){
+  LAST.raw = raw; LAST.term = term; LAST.items = items; LAST.offline = offline;
+  const localHits = libMatch(term,raw);
+  const strong = items.filter(x => x.score >= 5);
+  const mid = items.filter(x => x.score >= 2 && x.score < 5);
+  if(strong.length){
+    setStatus("ok","已见报道",`「${raw}」已用于碳点领域`,
+      `检索到 ${strong.length} 篇以其参与碳点制备或改性的文献。以下链接可直接核对原文。`);
+  }else if(mid.length){
+    setStatus("warn","相关线索 · 待核对",`「${raw}」检索到相关线索`,
+      `未找到标题层面的明确合成证据，但有 ${mid.length} 篇摘要提及该原料与碳点。请点开原文确认其角色。`);
+  }else if(items.length){
+    setStatus("muted","未确认作为原料",`暂未确认「${raw}」作为碳点原料`,
+      `检索到的多为“检测该物质”的应用类文献。这不等于没人用过，建议换别名或英文名称再查。`);
+  }else{
+    setStatus("none","未检索到明确报道",`未找到「${raw}」的相关碳点文献`,
+      `本次 OpenAlex 检索没有返回结果。可尝试同义词、化学式、商品名或掺杂形式。`);
+  }
+  if(offline){
+    $("statusText").textContent += "（当前在线检索失败，仅显示本地已核对条目）";
+  }
+  if(localHits.length){
+    $("statusText").textContent += ` 你自己的原料库中有 ${localHits.length} 条组合包含该原料。`;
+  }
+
+  const shown = items.slice().sort((a,b) => b.score - a.score || b.cited - a.cited || b.year - a.year).slice(0,12);
+  const refresh = `<button class="linkbtn" id="refresh" type="button">重新检索</button>`;
+  let html = localHitHTML(localHits);
+  html += shown.length
+    ? `<div class="section-title"><span>文献线索 · ${shown.length} 条</span>${refresh}</div>` + shown.map(paperHTML).join("")
+    : `<div class="section-title"><span>文献线索</span>${refresh}</div>`;
+  html += `<div class="section-title"><span></span><a class="linkbtn" href="https://openalex.org/works?search=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">在 OpenAlex 查看全部结果</a></div>`;
+  $("results").innerHTML = html;
+
+  $("refresh").addEventListener("click",() => { localStorage.removeItem("cdcheck:" + norm(term)); search(raw); });
+  $("results").querySelectorAll("[data-copy]").forEach(btn => {
+    btn.addEventListener("click",async () => {
+      try{ await navigator.clipboard.writeText("https://doi.org/" + btn.dataset.copy); btn.textContent = "已复制"; }
+      catch(e){ btn.textContent = "复制失败，请手动选取"; }
+    });
+  });
+}
+
+async function search(raw){
+  raw = raw.trim();
+  if(!raw) return;
+  const term = toEnglish(raw);
+  $("err").className = "err";
+  $("results").innerHTML = "";
+  if(hasCJK(raw) && !ALIAS_N[norm(raw)]){
+    setStatus("warn","需要英文名称",`「${raw}」不在本地词库中`,
+      `请改用英文原料名查询（如 citric acid、L-cysteine），或把这个中文名发给 WorkBuddy 让我补进词库。`);
+    return;
+  }
+  const cached = cacheGet(term);
+  if(cached){ render(term,raw,cached,false); return; }
+
+  $("go").disabled = true;
+  $("loading").className = "loading show";
+  $("loadingText").textContent = "正在检索 OpenAlex…";
+
+  try{
+    let found = [];
+    try{
+      found = await fetchWorks(term,false);
+      if(found.filter(p => cueRegex(norm(term),"synth").test(norm(p.title))).length < 2){
+        $("loadingText").textContent = "正在补充摘要检索…";
+        const extra = await fetchWorks(term,true);
+        const seen = new Set(found.map(x => x.doi.toLowerCase()));
+        for(const p of extra) if(!seen.has(p.doi.toLowerCase())){ found.push(p); seen.add(p.doi.toLowerCase()); }
+      }
+    }catch(netErr){
+      const seed = (SEED[norm(term)] || []).map(p => ({...p,title:p.title,year:p.year,cited:0,tags:[{text:"本地已核对",cls:"synth"}]}));
+      if(!seed.length) throw netErr;
+      $("err").className = "err show";
+      $("err").textContent = "在线检索失败（网络或接口限流）。已切换到本地已核对条目。";
+      render(term,raw,seed,true);
+      return;
+    }
+    const scored = found.map(p => scorePaper(p,term));
+    for(const s of (SEED[norm(term)] || [])){
+      if(!scored.some(x => x.doi.toLowerCase() === s.doi.toLowerCase())) scored.push({...s,cited:0,abstract:""});
+    }
+    cacheSet(term,scored);
+    render(term,raw,scored,false);
+  }catch(e){
+    $("err").className = "err show";
+    $("err").textContent = "检索失败：" + e.message + "。请检查网络后重试，或直接到 OpenAlex 搜索。";
+    setStatus("none","检索失败","暂时无法完成检索","请稍后重试，或点击下方的 OpenAlex 链接手动查询。");
+  }finally{
+    $("go").disabled = false;
+    $("loading").className = "loading";
+  }
+}
+
+$("chips").innerHTML = CHIPS.map(c => `<button class="chip" type="button">${c}</button>`).join("");
+$("chips").querySelectorAll(".chip").forEach(b => b.addEventListener("click",() => { $("q").value = b.textContent; search(b.textContent); }));
+$("form").addEventListener("submit",e => { e.preventDefault(); search($("q").value); });
+
+$("libToggle").addEventListener("click",() => {
+  const panel = $("libPanel");
+  panel.classList.toggle("show");
+  if(panel.classList.contains("show")) renderLibPanel();
+});
+$("libAdd").addEventListener("click",() => {
+  const name = $("libName").value.trim();
+  const mats = splitMats($("libMats").value);
+  if(!name || !mats.length){ alert("请填写组合名称和至少一个原料"); return; }
+  const list = libLoad();
+  list.push({id:String(Date.now()) + Math.random().toString(36).slice(2,7),name:name,materials:mats,note:$("libNote").value.trim()});
+  libSave(list);
+  $("libName").value = ""; $("libMats").value = ""; $("libNote").value = "";
+  refreshAfterLibChange();
+});
+$("libImport").addEventListener("click",() => {
+  try{
+    const rows = libParse($("libBulk").value);
+    if(!rows.length){ alert("未解析到有效记录。每行格式：名称 | 原料1,原料2 | 备注"); return; }
+    const list = libLoad().concat(rows);
+    libSave(list);
+    $("libBulk").value = "";
+    refreshAfterLibChange();
+    alert("已导入 " + rows.length + " 条组合");
+  }catch(err){ alert("导入失败：" + err.message); }
+});
+$("libExport").addEventListener("click",async () => {
+  const txt = libLoad().map(x => [x.name,(x.materials || []).join(","),x.note || ""].join(" | ")).join("\n");
+  $("libBulk").value = txt;
+  try{ await navigator.clipboard.writeText(txt); $("libExport").textContent = "已复制"; }
+  catch(e){ $("libExport").textContent = "已填入文本框"; }
+  setTimeout(() => { $("libExport").textContent = "导出文本"; },1800);
+});
+$("libClear").addEventListener("click",() => {
+  if(!confirm("确定清空本机保存的所有自定义原料组合吗？此操作不可撤销。")) return;
+  libSave([]);
+  refreshAfterLibChange();
+});
+$("libList").addEventListener("click",e => {
+  const btn = e.target.closest("[data-del]");
+  if(!btn) return;
+  libSave(libLoad().filter(x => x.id !== btn.dataset.del));
+  refreshAfterLibChange();
+});
+renderLibPanel();
+</script>
+</body>
+</html>

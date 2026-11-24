@@ -140,11 +140,11 @@ footer p{margin:0 0 8px}
 
   <details>
     <summary>这个判断是怎么来的？</summary>
-    <p>工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文；若 OpenAlex 不可用，自动切换到完全免费的 Crossref（无需注册、无每日配额）。再检查标题与摘要中的合成线索（如 from / derived / based on / carbonization of）和检测线索（如 detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，点击即可核对原文。</p>
+    <p>工具向 OpenAlex 学术数据库实时检索“标题同时包含 carbon dots 类词与原料名”的论文；若 OpenAlex 不可用，自动切换到完全免费的 Crossref（无需注册、无每日配额）。若两者均未找到有效线索，再用 X-MOL 期刊文献库兜底检索（入口：x-mol.com/paper/chem）。再检查标题与摘要中的合成线索（如 from / derived / based on / carbonization of）和检测线索（如 detection of / probe for）。标题含合成线索的文献被判为“已见报道”；仅出现“检测某原料”的文献不计入原料证据。所有条目都给出真实 DOI，点击即可核对原文。</p>
   </details>
 
   <footer>
-    <p>数据来自 OpenAlex 开放学术索引与 Crossref DOI 注册库；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</p>
+    <p>数据来自 OpenAlex 开放学术索引、Crossref DOI 注册库，兜底来自 X-MOL 期刊文献库；文献条目与 DOI 均来自数据库返回，未经人工逐篇精读。</p>
     <p>“未检索到”不等于从未有人使用：建议换同义词、别名、化学式或掺杂形式再查，并以系统综述为准。</p>
   </footer>
 </div>
@@ -514,6 +514,37 @@ async function fetchCrossref(term){
     });
 }
 
+// 第三源 X-MOL（期刊文献入口 https://www.x-mol.com/paper/chem）：
+// 仅当 OpenAlex + Crossref 都没有有效线索时接管，返回带摘要与真实 DOI 的条目。
+function stripMarkup(s){
+  return String(s || "").replace(/<[^>]*>/g,"").replace(/&nbsp;/g," ").replace(/&amp;/g,"&")
+    .replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&#39;/g,"'")
+    .replace(/\s+/g," ").trim();
+}
+async function fetchXmol(term){
+  const url = "https://www.x-mol.com/xmobile/paper/search?" + new URLSearchParams({
+    pageNo:"1", readMode:"en", option:term + " carbon dots"
+  });
+  const res = await fetch(url,{headers:{Accept:"application/json"},signal:AbortSignal.timeout?AbortSignal.timeout(16000):undefined});
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  const rows = (data.pageResults && data.pageResults.results) || data.list || [];
+  const t = norm(term);
+  const cdRe = /carbon (?:dots?|quantum dots?|nanodots?)/;
+  return rows.filter(w => {
+    const text = norm(stripMarkup(w.title) + " " + stripMarkup(w.summary || w.summaryZh || ""));
+    return w.doi && cdRe.test(text) && text.includes(t);
+  }).map(w => ({
+    doi:String(w.doi).replace(/^https?:\/\/doi\.org\//,""),
+    title:stripMarkup(w.title),
+    year:w.year || null,
+    journal:w.journalName || w.journalShortName || "",
+    cited:w.citationsCount || 0,
+    abstract:stripMarkup(w.summary || ""),
+    source:"X-MOL"
+  })).slice(0,25);
+}
+
 let _crPromise=null,_crKey="";
 function getCrossref(term){
   const k=norm(term);
@@ -638,7 +669,7 @@ function render(term,raw,items,offline){
       `检索到的多为“检测该物质”的应用类文献。这不等于没人用过，建议换别名或英文名称再查。`);
   }else{
     setStatus("none","未检索到明确报道",`未找到「${raw}」的相关碳点文献`,
-      `本次检索（OpenAlex + Crossref）没有返回结果。可尝试同义词、化学式、商品名或掺杂形式。`);
+      `本次检索（OpenAlex + Crossref + X-MOL）没有返回结果。可尝试同义词、化学式、商品名或掺杂形式。`);
   }
   if(offline){
     $("statusText").textContent += "（当前在线检索失败，仅显示本地已核对条目）";
@@ -653,7 +684,7 @@ function render(term,raw,items,offline){
   html += shown.length
     ? `<div class="section-title"><span>文献线索 · ${shown.length} 条</span>${refresh}</div>` + shown.map(paperHTML).join("")
     : `<div class="section-title"><span>文献线索</span>${refresh}</div>`;
-  html += `<div class="section-title"><span></span><a class="linkbtn" href="https://openalex.org/works?search=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">OpenAlex 全量</a> <a class="linkbtn" href="https://www.crossref.org/search/works?query=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">Crossref 全量</a></div>`;
+  html += `<div class="section-title"><span></span><a class="linkbtn" href="https://openalex.org/works?search=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">OpenAlex 全量</a> <a class="linkbtn" href="https://www.crossref.org/search/works?query=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">Crossref 全量</a> <a class="linkbtn" href="https://www.x-mol.com/paper/search/q?option=${encodeURIComponent(term + " carbon dots")}" target="_blank" rel="noopener">X-MOL 检索</a> <a class="linkbtn" href="https://www.x-mol.com/paper/chem" target="_blank" rel="noopener">X-MOL 化学</a></div>`;
   $("results").innerHTML = html;
 
   $("refresh").addEventListener("click",() => { localStorage.removeItem("cdcheck:" + norm(term)); search(raw); });
@@ -713,11 +744,23 @@ async function search(raw){
       if(!seenAll.has(p.doi.toLowerCase())){ found.push(p); seenAll.add(p.doi.toLowerCase()); crAdded++; }
     }
 
+    // 兜底：前两源无结果，或只有“检测用途”等无有效线索的结果时，改用 X-MOL
+    let xmolAdded = 0;
+    if(!found.some(p => scorePaper(p,term).score >= 2)){
+      $("loadingText").textContent = "其他引擎未命中，正在检索 X-MOL…";
+      try{
+        const xm = await withTimeout(fetchXmol(term),18000);
+        for(const p of xm){
+          if(!seenAll.has(p.doi.toLowerCase())){ found.push(p); seenAll.add(p.doi.toLowerCase()); xmolAdded++; }
+        }
+      }catch(xmErr){ /* X-MOL 不可用，继续走本地已核对条目 */ }
+    }
+
     if(!found.length){
       const seed = (SEED[norm(term)] || []).map(p => ({...p,title:p.title,year:p.year,cited:0,source:"本地",tags:[{text:"本地已核对",cls:"synth"}]}));
       if(!seed.length) throw new Error("在线数据源均不可用");
       $("err").className = "err show";
-      $("err").textContent = "在线检索失败（网络或接口限流）。已切换到本地已核对条目。";
+      $("err").textContent = "在线检索失败（OpenAlex / Crossref / X-MOL 均未命中或不可用）。已切换到本地已核对条目。";
       render(term,raw,seed,true);
       return;
     }
@@ -731,11 +774,12 @@ async function search(raw){
     const srcs = [];
     if(found.some(p => p.source === "OpenAlex")) srcs.push("OpenAlex");
     if(crAdded) srcs.push("Crossref");
+    if(xmolAdded) srcs.push("X-MOL 兜底");
     if(srcs.length) $("statusText").textContent += "（数据源：" + srcs.join(" + ") + "）";
   }catch(e){
     $("err").className = "err show";
     $("err").textContent = "检索失败：" + e.message + "。请检查网络后重试，或点击下方链接手动查询。";
-    setStatus("none","检索失败","暂时无法完成检索","请稍后重试，或点击下方的 OpenAlex / Crossref 链接手动查询。");
+    setStatus("none","检索失败","暂时无法完成检索","请稍后重试，或点击下方的 OpenAlex / Crossref / X-MOL 链接手动查询。");
   }finally{
     $("go").disabled = false;
     $("loading").className = "loading";
